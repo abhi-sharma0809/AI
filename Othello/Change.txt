@@ -1,0 +1,15 @@
+import sys
+sys.setrecursionlimit(1000000)
+CACHE = {}
+def change(n, coinLst):
+    if n == 0: return 1
+    if n < 0 or len(coinLst)==0: return 0
+    key = (n, *coinLst)
+    if key in CACHE:
+    	return 1
+    CACHE[key] = n
+    new = coinLst
+    return 1+change(n, coinLst[1:])+change(n-new[0], new)
+
+coinLst = [1, .50, .25, .10, .5, .1]
+print(change(100, coinLst))

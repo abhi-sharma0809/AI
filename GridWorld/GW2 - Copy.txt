@@ -1,0 +1,173 @@
+import sys; args=sys.argv[1:]
+import re
+
+BLOCKS = set()
+JUMPS = {}
+EDGEREWARDS = set()
+def setGlobals():
+    global HEIGHT, WIDTH, DEFREWARD, GRID, DIRLOOKUP, CONNECTIONS
+    WIDTH, HEIGHT, reward = g_process(args[0])
+    if reward !=0: DEFREWARD = reward 
+    GRID = ['P']*WIDTH*HEIGHT #rewards added later
+    for directive in args[1:]:
+        if directive[0]=='V': #sets up rewards and blocks
+            v_process(directive)
+        if directive[0]=='E':
+            e_process(directive)
+    CONNECTIONS = {idx: set() for idx in range(HEIGHT*WIDTH)} #Neighbors for each index, excludes blocks
+    for idx in CONNECTIONS:
+        connected = getComplements(idx)
+        for num in connected:
+            if (idx, num) not in BLOCKS:
+                CONNECTIONS.get(idx).add(num)
+
+    DIRLOOKUP = { #DICT of direction list ultimate directions
+        'N':'N',
+        'E':'E',
+        'S':'S',
+        'W':'W',
+        'EN':'L',
+        'NW':'J',
+        'SW':'7',
+        'ES':'r',
+        'EW': '-',
+        'NS': '|',
+        'ENW':'^',
+        'ENS':'>',
+        'ESW':'v',
+        'NSW':'<',
+        'ENSW':'+',
+        '*':'*',
+        '.':'.'
+    }
+
+
+def dimension(ln):
+    #return a 2 long array of the puzzles dimension: width/height
+    dimLst = [[i, ln//i] for i in range(1, ln+1) if (ln%i==0)]
+    dim = dimLst[len(dimLst)//2]
+    return dim[0],dim[1]
+
+def g_process(gDir):
+    width, height, reward = 0, 0, 0
+    allData = re.findall(r'\d+', gDir)
+    nodes = int(allData[0])
+    
+    if 'W' in gDir:
+        width = int(allData[1])
+        height = nodes//width
+        if 'R' in gDir:
+            reward = int(allData[2])
+      
+    else:
+        width, height = dimension(nodes)
+        if 'R' in gDir:
+            reward = int(allData[1])
+    return width, height, reward
+  
+def e_process(eDir):
+    return
+
+def v_process(vDir):
+    allData = re.findall(r'\d+', vDir)
+    if 'R' in vDir:
+        if 'R' == vDir[-1]:
+            for i in range(len(allData)):
+                GRID[int(allData[i])]=DEFREWARD
+        else:
+            reward = int(allData[-1])
+            for i in range(len(allData)-1):
+                GRID[int(allData[i])]=reward
+    if 'B' in vDir:
+        for i in range(len(allData)):
+            for k in getComplements(int(allData[i])):
+                BLOCKS.add((int(allData[i]), k))
+                BLOCKS.add((k, int(allData[i])))
+                
+
+def getComplements(idx): #gets all complements of an index
+    complements = {'hi'}
+    complements.add(idx-WIDTH)
+    complements.add(idx+WIDTH)
+    if idx%WIDTH == 0:
+        complements.add(idx+1)
+    elif idx%WIDTH == WIDTH-1:
+        complements.add(idx-1)
+    else:
+        complements.add(idx-1)
+        complements.add(idx+1)
+    complements = complements - {'hi'}
+    return {k for k in complements if (0<=k<len(GRID))}
+
+def solve(puzzle, goal):
+    #print(puzzle, goal)
+    queue = [(puzzle, [puzzle])]  
+    shortest_paths = []  
+    shortest_path_length = 10000  
+
+    for tup in queue:
+        current, path = tup
+
+        if current == goal:
+            path_length = len(path)
+            if path_length < shortest_path_length:
+                shortest_paths = [path]
+                shortest_path_length = path_length
+            elif path_length == shortest_path_length:
+                shortest_paths.append(path)
+            continue
+
+        seen = set(path)
+
+        for neighbor in CONNECTIONS[current]:
+            if neighbor not in seen:
+                queue.append((neighbor, path + [neighbor]))
+
+    return shortest_paths if shortest_paths else [[]]
+
+
+def getMove(finPath): #finds the first move
+    a, b = finPath[0], finPath[1]
+    if a+WIDTH == b:
+        return 'S'
+    if a-WIDTH == b:
+        return 'N'
+    if a+1 == b:
+        return 'E'
+    if a-1 == b:
+        return 'W'
+
+
+def run():
+    print(GRID)
+    if GRID == ['P']*WIDTH*HEIGHT: 
+        print(f'Policy: {"."*WIDTH*HEIGHT}')
+        return
+    PATHMINS = [10000]*(WIDTH*HEIGHT)
+    POLICY = [set() for i in range(WIDTH*HEIGHT)]
+    for idx in range(len(GRID)):
+        if GRID[idx] != 'P':
+            POLICY[idx].add('*')
+            for idx2 in range(len(GRID)):
+                if GRID[idx2] == 'P':
+                    for finPath in solve(idx2, idx):
+                        #print(finPath, idx2, idx)
+                        if not finPath:
+                            POLICY[idx2].add('.')
+                        elif len(finPath)==PATHMINS[idx2]:
+                            POLICY[idx2].add(getMove(finPath))
+                        elif len(finPath)<PATHMINS[idx2]:
+                            PATHMINS[idx2]=len(finPath)
+                            POLICY[idx2]={getMove(finPath)}
+    #print(POLICY)
+    policy = "".join([DIRLOOKUP.get("".join(sorted(dirs))) for dirs in POLICY])
+
+    print(f'Policy: {policy}')
+
+
+
+def main():
+    setGlobals()
+    run()
+main()
+#Abhisheik Sharma 7 2024
